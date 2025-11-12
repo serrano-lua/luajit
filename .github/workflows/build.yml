@@ -1,0 +1,74 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+    build-linux:
+      name: Build Linux
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          arch: [x64, x86]
+  
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v5
+
+        - name: Install dependencies
+          run: sudo apt-get update && sudo apt-get install -y build-essential gcc-multilib
+  
+        - name: Build
+          run: |
+            if [ "${{ matrix.arch }}" = "x86" ]; then
+              make CC="gcc -m64" HOST_CC="gcc -m64" TARGET_SYS=Linux
+            else
+              make CC="gcc -m32" HOST_CC="gcc -m32" TARGET_SYS=Linux
+            fi
+
+            mv src/libluajit.so src/lua51.so
+            mv src/libluajit.a src/lua51.a
+  
+        - name: Upload artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: luajit-linux-${{ matrix.arch }}
+            path: |
+              src/luajit
+              src/lua51.so
+              src/lua51.a
+
+    build-windows:
+      name: Build Windows
+      runs-on: windows-latest
+      permissions:
+        contents: write
+      strategy:
+        matrix:
+          arch: [x64, x86]
+  
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v5
+  
+        - name: Build
+          shell: cmd
+          run: |
+            if "${{ matrix.arch }}"=="x64" (
+              call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+            ) else (
+              call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
+            )
+            cd src
+            msvcbuild.bat
+            cd ..
+  
+        - name: Upload artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: luajit-windows-${{ matrix.arch }}
+            path: |
+              src/luajit.exe
+              src/lua51.dll
+              src/lua51.lib
